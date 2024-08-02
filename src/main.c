@@ -26,7 +26,7 @@ static void save_counts_to_json() {
   struct tm *t = localtime(&now);
   char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
-  char *json_str = json_asprintf("{total_bag: %.2f, total_gift: %.2f, time: \"%s\"}", total_bag, total_gift, time_str);
+  char *json_str = json_asprintf("{\"total_bag\": %.2f, \"total_gift\": %.2f, \"time\": \"%s\"}", total_bag, total_gift, time_str);
   if (json_str != NULL) {
     FILE *f = fopen(filename, "w");
     if (f != NULL) {
@@ -52,7 +52,7 @@ static void load_counts_from_json() {
     buffer[len] = '\0';
     fclose(f);
     double total_bag, total_gift;
-    json_scanf(buffer, len, "{total_bag: %lf, total_gift: %lf}", &total_bag, &total_gift);
+    json_scanf(buffer, len, "{\"total_bag\": %lf, \"total_gift\": %lf}", &total_bag, &total_gift);
     mgos_sys_config_set_app_total_bag(total_bag);
     mgos_sys_config_set_app_total_gift(total_gift);
     LOG(LL_INFO, ("Counts loaded from JSON: bag=%.2f, gift=%.2f", total_bag, total_gift));
@@ -96,21 +96,17 @@ static void check_machine_status(void *arg) {
   (void) arg;
 }
 
-// Timer callback to periodically save the counts and report status
+// Timer callback to periodically save the counts
 static void report_timer_cb(void *arg) {
   save_counts_to_json();
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
-  char message[256];
-  snprintf(message, sizeof(message), "{total_bag: %.2f, total_gift: %.2f, machine_on: %s, time: \"%s\"}",
-           mgos_sys_config_get_app_total_bag(),
-           mgos_sys_config_get_app_total_gift(),
-           mgos_sys_config_get_machine_on() ? "true" : "false",
-           time_str);
+  char message[128];
+  snprintf(message, sizeof(message), "{\"total_bag\": %.2f, \"total_gift\": %.2f, \"machine_on\": %s, \"time\": \"%s\"}", mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift(), mgos_sys_config_get_machine_on() ? "true" : "false", time_str);
   mgos_mqtt_pub(rpc_topic_pub, message, strlen(message), 1, false);
-  LOG(LL_INFO, ("Counts and status published: %s", message));
+  LOG(LL_INFO, ("Counts published: %s", message));
   (void) arg;
 }
 
@@ -121,17 +117,17 @@ static void rpc_set_counters_handler(struct mg_rpc_request_info *ri,
                                      void *cb_arg) {
   double total_bag, total_gift;
   bool bag_set = false, gift_set = false;
-  if (json_scanf(args, strlen(args), "{total_bag: %lf}", &total_bag) == 1) {
+  if (json_scanf(args, strlen(args), "{\"total_bag\": %lf}", &total_bag) == 1) {
     mgos_sys_config_set_app_total_bag(total_bag);
     bag_set = true;
   }
-  if (json_scanf(args, strlen(args), "{total_gift: %lf}", &total_gift) == 1) {
+  if (json_scanf(args, strlen(args), "{\"total_gift\": %lf}", &total_gift) == 1) {
     mgos_sys_config_set_app_total_gift(total_gift);
     gift_set = true;
   }
   if (bag_set || gift_set) {
     save_counts_to_json();
-    mg_rpc_send_responsef(ri, "{id: %d, result: true}", ri->id);
+    mg_rpc_send_responsef(ri, "{\"id\": %d, \"result\": true}", ri->id);
     LOG(LL_INFO, ("Set counts via RPC: bag_set=%d, gift_set=%d", bag_set, gift_set));
     char confirmation_msg[128];
     snprintf(confirmation_msg, sizeof(confirmation_msg), "{\"confirmation\": \"Counts updated via RPC\", \"total_bag\": %.2f, \"total_gift\": %.2f}", mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift());
@@ -151,15 +147,15 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   LOG(LL_INFO, ("Received message on topic %.*s: %.*s", topic_len, topic, msg_len, msg));
 
   struct json_token method_token, params_token;
-  if (json_scanf(msg, msg_len, "{method: %T, params: %T}", &method_token, &params_token) == 2) {
+  if (json_scanf(msg, msg_len, "{\"method\": %T, \"params\": %T}", &method_token, &params_token) == 2) {
     if (strncmp(method_token.ptr, "Counters.Set", method_token.len) == 0) {
       double total_bag, total_gift;
       bool bag_set = false, gift_set = false;
-      if (json_scanf(params_token.ptr, params_token.len, "{total_bag: %lf}", &total_bag) == 1) {
+      if (json_scanf(params_token.ptr, params_token.len, "{\"total_bag\": %lf}", &total_bag) == 1) {
         mgos_sys_config_set_app_total_bag(total_bag);
         bag_set = true;
       }
-      if (json_scanf(params_token.ptr, params_token.len, "{total_gift: %lf}", &total_gift) == 1) {
+      if (json_scanf(params_token.ptr, params_token.len, "{\"total_gift\": %lf}", &total_gift) == 1) {
         mgos_sys_config_set_app_total_gift(total_gift);
         gift_set = true;
       }
@@ -174,7 +170,7 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
       }
     } else if (strncmp(method_token.ptr, "App.SetPinMachine", method_token.len) == 0) {
       int pin_state;
-      if (json_scanf(params_token.ptr, params_token.len, "{pin_machine: %d}", &pin_state) == 1) {
+      if (json_scanf(params_token.ptr, params_token.len, "{\"pin_machine\": %d}", &pin_state) == 1) {
         int pin = mgos_sys_config_get_pin_machine();
         mgos_gpio_write(pin, pin_state);
         LOG(LL_INFO, ("Set pin %d to state %d", pin, pin_state));
