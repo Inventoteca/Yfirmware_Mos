@@ -57,6 +57,9 @@ config_schema:
   - ["pin_machine", "i", 4, {title: "Pin to control relay machine"}]
   - ["status_pin", "i", 33, {title: "Pin to read machine status"}]
   - ["machine_on", "b", false, {title: "Machine on status"}]
+  - ["app.enable_auto", "b", false, {title: "Enable automatic control"}]
+  - ["app.on_hour", "i", 8, {title: "Hour to turn on the machine"}]
+  - ["app.off_hour", "i", 16, {title: "Hour to turn off the machine"}]
 
   - ["coin.count_file", "s", "/counters.json", {title: "Coin count file"}]
   - ["coin.report_delay", "i", 5000, {title: "Coin report delay in ms"}]
