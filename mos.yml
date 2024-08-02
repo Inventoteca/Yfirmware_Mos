@@ -44,6 +44,8 @@ build_vars:
   COIN_REPORT_DELAY: 5000
 
 config_schema:
+  - ["app.total_bag", "d", 0.0, {title: "Total bag count"}]
+  - ["app.total_gift", "d", 0.0, {title: "Total gift count"}]
   - ["app.machine_id", "s", "M-E2-EA-MUEE-0", {title: "Machine ID"}]
   - ["wifi.sta.ssid", "s", "Inventoteca_2G", {title: "SSID"}]
   - ["wifi.sta.pass", "s", "science_7425", {title: "Password"}]
