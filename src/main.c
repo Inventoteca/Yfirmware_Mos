@@ -58,6 +58,7 @@ static void gift_isr(int pin_gift, void *arg) {
 }
 
 static void report_timer_cb(void *arg) {
+  if (coin_count != prev_coin_count || gift_count != prev_gift_count) {
     char *machine_id = (char *) mgos_sys_config_get_app_machine_id();
     char topic[100];
     snprintf(topic, sizeof(topic), "machines/%s/out/report", machine_id);
