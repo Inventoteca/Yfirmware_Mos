@@ -17,6 +17,7 @@ static char rpc_topic_pub[100];
 static char rpc_topic_sub[100];
 static char confirmation_topic[100];
 static char status_topic[100];
+int pin_machine;
 
 // Function to save total bag count, total gift count, enable_auto, on_hour, and off_hour to JSON
 static void save_counts_to_json() {
@@ -244,6 +245,8 @@ static void rpc_set_off_hour_handler(struct mg_rpc_request_info *ri,
   (void) cb_arg;
 }
 
+
+
 // MQTT message handler to change the configuration
 static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
                                  int topic_len, const char *msg, int msg_len,
@@ -337,7 +340,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   int report_delay = mgos_sys_config_get_coin_report_delay();
   report_timer_id = mgos_set_timer(report_delay, MGOS_TIMER_REPEAT, report_timer_cb, NULL);
 
-  int pin_machine = mgos_sys_config_get_pin_machine();
+  pin_machine = mgos_sys_config_get_pin_machine();
   mgos_gpio_set_mode(pin_machine, MGOS_GPIO_MODE_OUTPUT);
 
   int status_pin = mgos_sys_config_get_status_pin();
@@ -364,23 +367,6 @@ enum mgos_app_init_result mgos_app_init(void) {
 
   // Set a timer to control the machine automatically based on the schedule
   auto_control_timer_id = mgos_set_timer(60000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
-
-  // WiFi configuration
-  const char *ssid = mgos_sys_config_get_wifi_sta_ssid();
-  const char *pass = mgos_sys_config_get_wifi_sta_pass();
-  if (ssid && pass) {
-    struct mgos_config_wifi_sta sta_cfg;
-    memset(&sta_cfg, 0, sizeof(sta_cfg));
-    sta_cfg.enable = true;
-    sta_cfg.ssid = strdup(ssid);
-    sta_cfg.pass = strdup(pass);
-    mgos_wifi_setup_sta(&sta_cfg);
-    free((void *) sta_cfg.ssid);
-    free((void *) sta_cfg.pass);
-  } else {
-    LOG(LL_ERROR, ("WiFi SSID or password not set"));
-    return MGOS_APP_INIT_ERROR;
-  }
 
   return MGOS_APP_INIT_SUCCESS;
 }
