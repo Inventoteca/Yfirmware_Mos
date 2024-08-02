@@ -11,9 +11,11 @@
 
 // Global variables
 static mgos_timer_id report_timer_id;
+static mgos_timer_id status_check_timer_id;
 static char rpc_topic_pub[100];
 static char rpc_topic_sub[100];
 static char confirmation_topic[100];
+static char status_topic[100];
 
 // Function to save total bag count and total gift count to JSON
 static void save_counts_to_json() {
@@ -79,17 +81,36 @@ static void gift_isr(int pin, void *arg) {
   (void) arg;
 }
 
-// Timer callback to periodically save the counts
+// Function to check the status of the machine and update machine_on
+static void check_machine_status(void *arg) {
+  int status_pin = mgos_sys_config_get_status_pin();
+  bool current_status = mgos_gpio_read(status_pin);
+  bool machine_on = mgos_sys_config_get_machine_on();
+  if (current_status != machine_on) {
+    mgos_sys_config_set_machine_on(current_status);
+    char message[64];
+    snprintf(message, sizeof(message), "{\"machine_on\": %s}", current_status ? "true" : "false");
+    mgos_mqtt_pub(status_topic, message, strlen(message), 1, false);
+    LOG(LL_INFO, ("Machine status changed: machine_on=%s", current_status ? "true" : "false"));
+  }
+  (void) arg;
+}
+
+// Timer callback to periodically save the counts and report status
 static void report_timer_cb(void *arg) {
   save_counts_to_json();
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
-  char message[128];
-  snprintf(message, sizeof(message), "{total_bag: %.2f, total_gift: %.2f, time: \"%s\"}", mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift(), time_str);
+  char message[256];
+  snprintf(message, sizeof(message), "{total_bag: %.2f, total_gift: %.2f, machine_on: %s, time: \"%s\"}",
+           mgos_sys_config_get_app_total_bag(),
+           mgos_sys_config_get_app_total_gift(),
+           mgos_sys_config_get_machine_on() ? "true" : "false",
+           time_str);
   mgos_mqtt_pub(rpc_topic_pub, message, strlen(message), 1, false);
-  LOG(LL_INFO, ("Counts published: %s", message));
+  LOG(LL_INFO, ("Counts and status published: %s", message));
   (void) arg;
 }
 
@@ -151,6 +172,18 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
       } else {
         LOG(LL_ERROR, ("Invalid JSON format for total_bag and total_gift parameters"));
       }
+    } else if (strncmp(method_token.ptr, "App.SetPinMachine", method_token.len) == 0) {
+      int pin_state;
+      if (json_scanf(params_token.ptr, params_token.len, "{pin_machine: %d}", &pin_state) == 1) {
+        int pin = mgos_sys_config_get_pin_machine();
+        mgos_gpio_write(pin, pin_state);
+        LOG(LL_INFO, ("Set pin %d to state %d", pin, pin_state));
+        char confirmation_msg[128];
+        snprintf(confirmation_msg, sizeof(confirmation_msg), "{\"confirmation\": \"Pin state updated\", \"pin\": %d, \"state\": %d}", pin, pin_state);
+        mgos_mqtt_pub(confirmation_topic, confirmation_msg, strlen(confirmation_msg), 1, false);
+      } else {
+        LOG(LL_ERROR, ("Invalid JSON format for pin_machine"));
+      }
     } else {
       LOG(LL_ERROR, ("Invalid method"));
     }
@@ -180,10 +213,17 @@ enum mgos_app_init_result mgos_app_init(void) {
   int report_delay = mgos_sys_config_get_coin_report_delay();
   report_timer_id = mgos_set_timer(report_delay, MGOS_TIMER_REPEAT, report_timer_cb, NULL);
 
+  int pin_machine = mgos_sys_config_get_pin_machine();
+  mgos_gpio_set_mode(pin_machine, MGOS_GPIO_MODE_OUTPUT);
+
+  int status_pin = mgos_sys_config_get_status_pin();
+  mgos_gpio_set_mode(status_pin, MGOS_GPIO_MODE_INPUT);
+
   const char *machine_id = mgos_sys_config_get_app_machine_id();
   snprintf(rpc_topic_pub, sizeof(rpc_topic_pub), "machine/%s/in/report", machine_id);
   snprintf(rpc_topic_sub, sizeof(rpc_topic_sub), "machine/%s/out/set", machine_id);
   snprintf(confirmation_topic, sizeof(confirmation_topic), "machine/%s/confirmation", machine_id);
+  snprintf(status_topic, sizeof(status_topic), "machine/%s/status", machine_id);
 
   // Register the RPC handlers
   mgos_rpc_add_handler("Counters.Set", rpc_set_counters_handler, NULL);
@@ -191,6 +231,9 @@ enum mgos_app_init_result mgos_app_init(void) {
 
   // Subscribe to the MQTT topic
   mgos_mqtt_sub(rpc_topic_sub, mqtt_message_handler, NULL);
+
+  // Set a timer to check the machine status periodically
+  status_check_timer_id = mgos_set_timer(1000 /* 1 second */, MGOS_TIMER_REPEAT, check_machine_status, NULL);
 
   // WiFi configuration
   const char *ssid = mgos_sys_config_get_wifi_sta_ssid();

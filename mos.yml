@@ -51,10 +51,16 @@ config_schema:
   - ["wifi.sta.pass", "s", "science_7425", {title: "Password"}]
   - ["wifi.sta.enable", "b", true, {title: "Enable WiFi"}]
   - ["sys.mount.fs_size", "i", 2048, {title: "Filesystem size in KB"}]
+
   - ["coin_pin", "i", 26, {title: "Coin pin"}]
   - ["gift_pin", "i", 25, {title: "Gift pin"}]
+  - ["pin_machine", "i", 4, {title: "Pin to control relay machine"}]
+  - ["status_pin", "i", 33, {title: "Pin to read machine status"}]
+  - ["machine_on", "b", false, {title: "Machine on status"}]
+
   - ["coin.count_file", "s", "/counters.json", {title: "Coin count file"}]
   - ["coin.report_delay", "i", 5000, {title: "Coin report delay in ms"}]
+
   - ["dash.enable", "b", true, {title: "Enable mDash"}]
   - ["dash.token", "s", "4n8KckV1Ih99NrK7QTmZA91w", {title: "mDash token"}]
   - ["rpc.uart.enable", "b", true, {title: "Enable UART for RPC"}]
