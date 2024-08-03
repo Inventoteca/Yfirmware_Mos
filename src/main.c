@@ -9,7 +9,6 @@
 #include "mgos_rpc.h"
 #include "mgos_dash.h"
 
-
 // Global variables
 static mgos_timer_id report_timer_id;
 static mgos_timer_id status_check_timer_id;
@@ -116,6 +115,7 @@ static void check_machine_status(void *arg) {
 
 // Timer callback to control the machine based on the schedule
 static void auto_control_cb(void *arg) {
+  load_counts_from_json(); // Reload the counts from JSON to get the latest on_hour and off_hour
   bool enable_auto = mgos_sys_config_get_app_enable_auto();
   int on_hour = mgos_sys_config_get_app_on_hour();
   int off_hour = mgos_sys_config_get_app_off_hour();
@@ -126,11 +126,17 @@ static void auto_control_cb(void *arg) {
     int current_hour = t->tm_hour;
 
     if (current_hour == on_hour) {
-      mgos_gpio_write(mgos_sys_config_get_pin_machine(), 1);  // Turn on the machine
+      mgos_gpio_write(pin_machine, 0);  // Turn on the machine
       LOG(LL_INFO, ("Machine turned on automatically at %d:00", on_hour));
     } else if (current_hour == off_hour) {
-      mgos_gpio_write(mgos_sys_config_get_pin_machine(), 0);  // Turn off the machine
+      mgos_gpio_write(pin_machine, 1);  // Turn off the machine
       LOG(LL_INFO, ("Machine turned off automatically at %d:00", off_hour));
+    } else if (current_hour > on_hour && current_hour < off_hour && !mgos_gpio_read(pin_machine)) {
+      mgos_gpio_write(pin_machine, 0);  // Ensure the machine stays on between on_hour and off_hour
+      LOG(LL_INFO, ("Machine re-enabled during operational hours"));
+    } else if ((current_hour < on_hour || current_hour > off_hour) && mgos_gpio_read(pin_machine)) {
+      mgos_gpio_write(pin_machine, 1);  // Ensure the machine stays off outside operational hours
+      LOG(LL_INFO, ("Machine disabled outside operational hours"));
     }
   }
   (void) arg;
@@ -257,8 +263,6 @@ static void rpc_set_off_hour_handler(struct mg_rpc_request_info *ri,
   (void) cb_arg;
 }
 
-
-
 // MQTT message handler to change the configuration
 static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
                                  int topic_len, const char *msg, int msg_len,
@@ -334,22 +338,17 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   (void) userdata;
 }
 
-// Inicialización del ------------------------ DS3231
+// Inicialización del DS3231
 bool ds3231_init(void) {
   rtc = mgos_ds3231_create(104);
   if (rtc == NULL) {
     LOG(LL_ERROR, ("Failed to initialize DS3231"));
     return false;
-  }
-  else
-  {
+  } else {
     LOG(LL_INFO, ("RTC INIT OK"));
-    //const struct mgos_ds3231_date_time *dt;
-    //dt = mgos_ds3231_read(rtc);
     mgos_ds3231_settimeofday(rtc);
     return true;
   }
-  
 }
 
 enum mgos_app_init_result mgos_app_init(void) {
@@ -401,8 +400,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   status_check_timer_id = mgos_set_timer(1000 /* 1 second */, MGOS_TIMER_REPEAT, check_machine_status, NULL);
 
   // Set a timer to control the machine automatically based on the schedule
-  auto_control_timer_id = mgos_set_timer(60000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
-
+  auto_control_timer_id = mgos_set_timer(20000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
 
   return MGOS_APP_INIT_SUCCESS;
 }
