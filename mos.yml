@@ -79,4 +79,4 @@ config_schema:
   - ["i2c.sda_gpio", "i", 21, {title: "I2C SDA GPIO Pin"}]
   - ["i2c.scl_gpio", "i", 22, {title: "I2C SCL GPIO Pin"}]
 
-
+  - ["sys.tz_spec", "CST7CDT,M4.1.0,M10.5.0"]
