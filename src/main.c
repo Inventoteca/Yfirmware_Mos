@@ -149,19 +149,28 @@ static void report_timer_cb(void *arg) {
   struct tm *t = localtime(&now);
   char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
-  char message[256];
-  now = time(NULL);
-  t = localtime(&now);
+  
+  char message[512];  // Aumenta el tamaño si es necesario
+  struct json_out out = JSON_OUT_BUF(message, sizeof(message));
 
-  snprintf(time_str, sizeof(time_str), "%02d:%02d", t->tm_hour,t->tm_min); 
-  snprintf(message, sizeof(message), "{total_bag: %.2f, total_gift: %.2f, machine_on: %s, enable_auto: %s, on_hour: %d, off_hour: %d, time: \"%s\"}",
-           mgos_sys_config_get_app_total_bag(),
-           mgos_sys_config_get_app_total_gift(),
-           mgos_sys_config_get_machine_on() ? "true" : "false",
-           mgos_sys_config_get_app_enable_auto() ? "true" : "false",
-           mgos_sys_config_get_app_on_hour(),
-           mgos_sys_config_get_app_off_hour(),
-           time_str);
+  json_printf(&out,
+              "{\n"
+              "  total_bag: %.2f,\n"
+              "  total_gift: %.2f,\n"
+              "  machine_on: %B,\n"
+              "  enable_auto: %B,\n"
+              "  on_hour: %d,\n"
+              "  off_hour: %d,\n"
+              "  time: %Q\n"
+              "}",
+              mgos_sys_config_get_app_total_bag(),
+              mgos_sys_config_get_app_total_gift(),
+              mgos_sys_config_get_machine_on(),
+              mgos_sys_config_get_app_enable_auto(),
+              mgos_sys_config_get_app_on_hour(),
+              mgos_sys_config_get_app_off_hour(),
+              time_str);
+
   mgos_mqtt_pub(rpc_topic_pub, message, strlen(message), 1, false);
   LOG(LL_INFO, ("Counts published: %s", message));
   (void) arg;
