@@ -9,7 +9,6 @@
 #include "mgos_rpc.h"
 #include "mgos_dash.h"
 
-
 // Global variables
 static mgos_timer_id report_timer_id;
 static mgos_timer_id status_check_timer_id;
@@ -56,7 +55,7 @@ static void save_counts_to_json() {
 }
 
 // Function to load total bag count, total gift count, enable_auto, on_hour, and off_hour from JSON
-static void load_counts_from_json() {
+static bool load_counts_from_json(double *total_bag, double *total_gift, bool *enable_auto, int *on_hour, int *off_hour) {
   const char *filename = mgos_sys_config_get_coin_count_file();
   FILE *f = fopen(filename, "r");
   if (f != NULL) {
@@ -64,19 +63,15 @@ static void load_counts_from_json() {
     int len = fread(buffer, 1, sizeof(buffer) - 1, f);
     buffer[len] = '\0';
     fclose(f);
-    double total_bag, total_gift;
-    bool enable_auto;
-    int on_hour, off_hour;
-    json_scanf(buffer, len, "{total_bag: %lf, total_gift: %lf, enable_auto: %B, on_hour: %d, off_hour: %d}", &total_bag, &total_gift, &enable_auto, &on_hour, &off_hour);
-    mgos_sys_config_set_app_total_bag(total_bag);
-    mgos_sys_config_set_app_total_gift(total_gift);
-    mgos_sys_config_set_app_enable_auto(enable_auto);
-    mgos_sys_config_set_app_on_hour(on_hour);
-    mgos_sys_config_set_app_off_hour(off_hour);
-    LOG(LL_INFO, ("Counts loaded from JSON: bag=%.2f, gift=%.2f, enable_auto=%d, on_hour=%d, off_hour=%d", total_bag, total_gift, enable_auto, on_hour, off_hour));
+    if (json_scanf(buffer, len, "{total_bag: %lf, total_gift: %lf, enable_auto: %B, on_hour: %d, off_hour: %d}", total_bag, total_gift, enable_auto, on_hour, off_hour) == 5) {
+      return true;
+    } else {
+      LOG(LL_ERROR, ("Failed to parse JSON"));
+    }
   } else {
-    LOG(LL_ERROR, ("Failed to open file for reading, starting from initial value"));
+    LOG(LL_ERROR, ("Failed to open file for reading"));
   }
+  return false;
 }
 
 // ISR for coin insertion
@@ -116,23 +111,34 @@ static void check_machine_status(void *arg) {
 
 // Timer callback to control the machine based on the schedule
 static void auto_control_cb(void *arg) {
-  bool enable_auto = mgos_sys_config_get_app_enable_auto();
-  int on_hour = mgos_sys_config_get_app_on_hour();
-  int off_hour = mgos_sys_config_get_app_off_hour();
+  double total_bag, total_gift;
+  bool enable_auto;
+  int on_hour, off_hour;
+
+  if (!load_counts_from_json(&total_bag, &total_gift, &enable_auto, &on_hour, &off_hour)) {
+    LOG(LL_ERROR, ("Failed to load counts from JSON"));
+    return;
+  }
+
+  time_t now = time(NULL);
+  struct tm *t = localtime(&now);
+  int current_hour = t->tm_hour;
 
   if (enable_auto) {
-    time_t now = time(NULL);
-    struct tm *t = localtime(&now);
-    int current_hour = t->tm_hour;
-
-    if (current_hour == on_hour) {
-      mgos_gpio_write(mgos_sys_config_get_pin_machine(), 1);  // Turn on the machine
-      LOG(LL_INFO, ("Machine turned on automatically at %d:00", on_hour));
-    } else if (current_hour == off_hour) {
-      mgos_gpio_write(mgos_sys_config_get_pin_machine(), 0);  // Turn off the machine
-      LOG(LL_INFO, ("Machine turned off automatically at %d:00", off_hour));
+    if (current_hour >= on_hour && current_hour < off_hour) {
+      mgos_gpio_write(pin_machine, 0 );  // Turn on the machine
+      LOG(LL_INFO, ("Machine turned on automatically at %d:00", current_hour));
+    } else {
+      mgos_gpio_write(pin_machine, 1);  // Turn off the machine
+      LOG(LL_INFO, ("Machine turned off automatically at %d:00", current_hour));
     }
+  } else {
+    // Allow manual control if enable_auto is false
+    bool machine_on = mgos_sys_config_get_machine_on();
+    mgos_gpio_write(pin_machine, machine_on ? 1 : 0);
+    LOG(LL_INFO, ("Machine manually controlled: %s", machine_on ? "on" : "off"));
   }
+
   (void) arg;
 }
 
@@ -147,7 +153,7 @@ static void report_timer_cb(void *arg) {
   now = time(NULL);
   t = localtime(&now);
 
-  snprintf(time_str, sizeof(time_str), "%02d:%02d", t->tm_hour,t->tm_min); 
+  snprintf(time_str, sizeof(time_str), "%02d:%02d", t->tm_hour, t->tm_min);
   snprintf(message, sizeof(message), "{total_bag: %.2f, total_gift: %.2f, machine_on: %s, enable_auto: %s, on_hour: %d, off_hour: %d, time: \"%s\"}",
            mgos_sys_config_get_app_total_bag(),
            mgos_sys_config_get_app_total_gift(),
@@ -257,8 +263,6 @@ static void rpc_set_off_hour_handler(struct mg_rpc_request_info *ri,
   (void) cb_arg;
 }
 
-
-
 // MQTT message handler to change the configuration
 static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
                                  int topic_len, const char *msg, int msg_len,
@@ -334,26 +338,29 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   (void) userdata;
 }
 
-// Inicialización del ------------------------ DS3231
+// Inicialización del DS3231
 bool ds3231_init(void) {
   rtc = mgos_ds3231_create(104);
   if (rtc == NULL) {
     LOG(LL_ERROR, ("Failed to initialize DS3231"));
     return false;
-  }
-  else
-  {
+  } else {
     LOG(LL_INFO, ("RTC INIT OK"));
-    //const struct mgos_ds3231_date_time *dt;
-    //dt = mgos_ds3231_read(rtc);
     mgos_ds3231_settimeofday(rtc);
     return true;
   }
-  
 }
 
 enum mgos_app_init_result mgos_app_init(void) {
-  load_counts_from_json(); // Load the initial counts from JSON
+  double total_bag, total_gift;
+  bool enable_auto;
+  int on_hour, off_hour;
+
+  // Load the initial counts from JSON
+  if (!load_counts_from_json(&total_bag, &total_gift, &enable_auto, &on_hour, &off_hour)) {
+    LOG(LL_ERROR, ("Failed to load initial counts from JSON"));
+    return MGOS_APP_INIT_ERROR;
+  }
 
   if (!ds3231_init()) {
     LOG(LL_ERROR, ("Failed to initialize DS3231"));
@@ -401,8 +408,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   status_check_timer_id = mgos_set_timer(1000 /* 1 second */, MGOS_TIMER_REPEAT, check_machine_status, NULL);
 
   // Set a timer to control the machine automatically based on the schedule
-  auto_control_timer_id = mgos_set_timer(60000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
-
+  auto_control_timer_id = mgos_set_timer(10000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
 
   return MGOS_APP_INIT_SUCCESS;
 }
