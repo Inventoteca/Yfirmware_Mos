@@ -54,6 +54,7 @@ static void save_counts_to_json() {
   }
 }
 
+
 // Function to load total bag count, total gift count, enable_auto, on_hour, and off_hour from JSON
 static void load_counts_from_json() {
   const char *filename = mgos_sys_config_get_coin_count_file();
@@ -77,6 +78,7 @@ static void load_counts_from_json() {
     LOG(LL_ERROR, ("Failed to open file for reading, starting from initial value"));
   }
 }
+
 
 // ISR for coin insertion
 static void coin_isr(int pin, void *arg) {
@@ -409,7 +411,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   status_check_timer_id = mgos_set_timer(1000 /* 1 second */, MGOS_TIMER_REPEAT, check_machine_status, NULL);
 
   // Set a timer to control the machine automatically based on the schedule
-  auto_control_timer_id = mgos_set_timer(15000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
+  auto_control_timer_id = mgos_set_timer(5000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
 
   return MGOS_APP_INIT_SUCCESS;
 }
