@@ -73,17 +73,10 @@ config_schema:
   - ["mqtt.server", "s", "broker.emqx.io:1883", {title: "MQTT Server"}]
   - ["rpc.mqtt.enable", "b", true, {title: "Enable RPC over MQTT"}]
 
+ # I2C
+  - ["i2c.enable", "b", true, {title: "Enable I2C"}]
+  - ["i2c.freq", "i", 100000, {title: "I2C Frequency (Hz)"}]
+  - ["i2c.sda_gpio", "i", 21, {title: "I2C SDA GPIO Pin"}]
+  - ["i2c.scl_gpio", "i", 22, {title: "I2C SCL GPIO Pin"}]
 
-ffi_symbols:
-  - pcnt_unit_config
-  - pcnt_counter_pause
-  - pcnt_counter_resume
-  - pcnt_counter_clear
-  - pcnt_get_counter_value
-  - pcnt_event_enable
-  - pcnt_event_disable
-  - pcnt_isr_service_install
-  - pcnt_isr_handler_add
-  - pcnt_isr_handler_remove
-  - pcnt_set_event_value
-  - pcnt_set_filter_value
+

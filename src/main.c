@@ -3,11 +3,12 @@
 #include "mgos_sys_config.h"
 #include "mgos_mqtt.h"
 #include "mgos_wifi.h"
-#include "esp_wifi.h"
+#include "mgos_i2c.h"
+#include "mgos_ds3231.h"
 #include "frozen.h"
 #include "mgos_rpc.h"
 #include "mgos_dash.h"
-#include "mgos_i2c.h"
+
 
 // Global variables
 static mgos_timer_id report_timer_id;
@@ -18,6 +19,13 @@ static char rpc_topic_sub[100];
 static char confirmation_topic[100];
 static char status_topic[100];
 int pin_machine;
+char time_str[9];
+char date_str[12];
+
+// Declaración del manejador del DS3231
+struct mgos_ds3231 *rtc = NULL;
+time_t now;
+struct tm *t;
 
 // Function to save total bag count, total gift count, enable_auto, on_hour, and off_hour to JSON
 static void save_counts_to_json() {
@@ -136,6 +144,10 @@ static void report_timer_cb(void *arg) {
   char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
   char message[256];
+  now = time(NULL);
+  t = localtime(&now);
+
+  snprintf(time_str, sizeof(time_str), "%02d:%02d", t->tm_hour,t->tm_min); 
   snprintf(message, sizeof(message), "{total_bag: %.2f, total_gift: %.2f, machine_on: %s, enable_auto: %s, on_hour: %d, off_hour: %d, time: \"%s\"}",
            mgos_sys_config_get_app_total_bag(),
            mgos_sys_config_get_app_total_gift(),
@@ -322,8 +334,31 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   (void) userdata;
 }
 
+// Inicialización del ------------------------ DS3231
+bool ds3231_init(void) {
+  rtc = mgos_ds3231_create(104);
+  if (rtc == NULL) {
+    LOG(LL_ERROR, ("Failed to initialize DS3231"));
+    return false;
+  }
+  else
+  {
+    LOG(LL_INFO, ("RTC INIT OK"));
+    //const struct mgos_ds3231_date_time *dt;
+    //dt = mgos_ds3231_read(rtc);
+    mgos_ds3231_settimeofday(rtc);
+    return true;
+  }
+  
+}
+
 enum mgos_app_init_result mgos_app_init(void) {
   load_counts_from_json(); // Load the initial counts from JSON
+
+  if (!ds3231_init()) {
+    LOG(LL_ERROR, ("Failed to initialize DS3231"));
+    return MGOS_APP_INIT_ERROR;
+  }
 
   int coin_pin = mgos_sys_config_get_coin_pin();
   mgos_gpio_set_mode(coin_pin, MGOS_GPIO_MODE_INPUT);
@@ -367,6 +402,7 @@ enum mgos_app_init_result mgos_app_init(void) {
 
   // Set a timer to control the machine automatically based on the schedule
   auto_control_timer_id = mgos_set_timer(60000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
+
 
   return MGOS_APP_INIT_SUCCESS;
 }
