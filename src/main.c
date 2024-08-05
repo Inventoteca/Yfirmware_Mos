@@ -21,6 +21,8 @@ int pin_machine;
 char time_str[9];
 char date_str[12];
 
+bool enable_auto;
+
 // Declaración del manejador del DS3231
 struct mgos_ds3231 *rtc = NULL;
 time_t now;
@@ -31,7 +33,7 @@ static void save_counts_to_json() {
   const char *filename = mgos_sys_config_get_coin_count_file();
   double total_bag = mgos_sys_config_get_app_total_bag();
   double total_gift = mgos_sys_config_get_app_total_gift();
-  bool enable_auto = mgos_sys_config_get_app_enable_auto();
+  enable_auto = mgos_sys_config_get_app_enable_auto();
   int on_hour = mgos_sys_config_get_app_on_hour();
   int off_hour = mgos_sys_config_get_app_off_hour();
   double init_bag = mgos_sys_config_get_app_init_bag();
@@ -61,7 +63,8 @@ static void save_counts_to_json() {
 
 
 // Function to load total bag count, total gift count, enable_auto, on_hour, and off_hour from JSON
-static void load_counts_from_json() {
+static void load_counts_from_json() 
+{
   const char *filename = mgos_sys_config_get_coin_count_file();
   FILE *f = fopen(filename, "r");
   if (f != NULL) {
@@ -70,7 +73,7 @@ static void load_counts_from_json() {
     buffer[len] = '\0';
     fclose(f);
     double total_bag, total_gift, init_bag, init_gift;
-    bool enable_auto;
+    //bool enable_auto;
     int on_hour, off_hour;
     json_scanf(buffer, len, "{total_bag: %lf, total_gift: %lf, enable_auto: %B, on_hour: %d, off_hour: %d, init_bag: %lf, init_gift: %lf}",
                &total_bag, &total_gift, &enable_auto, &on_hour, &off_hour, &init_bag, &init_gift);
@@ -129,7 +132,7 @@ static void check_machine_status(void *arg) {
 // Timer callback to control the machine based on the schedule
 static void auto_control_cb(void *arg) {
   load_counts_from_json(); // Reload the counts from JSON to get the latest on_hour and off_hour
-  bool enable_auto = mgos_sys_config_get_app_enable_auto();
+  enable_auto = mgos_sys_config_get_app_enable_auto();
   int on_hour = mgos_sys_config_get_app_on_hour();
   int off_hour = mgos_sys_config_get_app_off_hour();
 
@@ -234,7 +237,7 @@ static void rpc_set_enable_auto_handler(struct mg_rpc_request_info *ri,
                                         const char *args,
                                         const char *src,
                                         void *cb_arg) {
-  bool enable_auto;
+  //bool enable_auto;
   if (json_scanf(args, strlen(args), "{enable_auto: %B}", &enable_auto) == 1) {
     mgos_sys_config_set_app_enable_auto(enable_auto);
     save_counts_to_json();
@@ -334,7 +337,7 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
         LOG(LL_ERROR, ("Invalid JSON format for total_bag, total_gift, init_bag, and init_gift parameters"));
       }
     } else if (strncmp(method_token.ptr, "App.SetEnableAuto", method_token.len) == 0) {
-      bool enable_auto;
+      //bool enable_auto;
       if (json_scanf(params_token.ptr, params_token.len, "{enable_auto: %B}", &enable_auto) == 1) {
         mgos_sys_config_set_app_enable_auto(enable_auto);
         save_counts_to_json();
