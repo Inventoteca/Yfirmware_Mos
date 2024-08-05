@@ -34,17 +34,21 @@ static void save_counts_to_json() {
   bool enable_auto = mgos_sys_config_get_app_enable_auto();
   int on_hour = mgos_sys_config_get_app_on_hour();
   int off_hour = mgos_sys_config_get_app_off_hour();
+  double init_bag = mgos_sys_config_get_app_init_bag();
+  double init_gift = mgos_sys_config_get_app_init_gift();
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
-  char *json_str = json_asprintf("{total_bag: %.2f, total_gift: %.2f, enable_auto: %B, on_hour: %d, off_hour: %d, time: \"%s\"}", total_bag, total_gift, enable_auto, on_hour, off_hour, time_str);
+  char *json_str = json_asprintf("{total_bag: %.2f, total_gift: %.2f, enable_auto: %B, on_hour: %d, off_hour: %d, init_bag: %.2f, init_gift: %.2f, time: \"%s\"}",
+                                 total_bag, total_gift, enable_auto, on_hour, off_hour, init_bag, init_gift, time_str);
   if (json_str != NULL) {
     FILE *f = fopen(filename, "w");
     if (f != NULL) {
       fwrite(json_str, 1, strlen(json_str), f);
       fclose(f);
-      LOG(LL_INFO, ("Counts saved to JSON: bag=%.2f, gift=%.2f, enable_auto=%d, on_hour=%d, off_hour=%d", total_bag, total_gift, enable_auto, on_hour, off_hour));
+      LOG(LL_INFO, ("Counts saved to JSON: bag=%.2f, gift=%.2f, enable_auto=%d, on_hour=%d, off_hour=%d, init_bag=%.2f, init_gift=%.2f",
+                    total_bag, total_gift, enable_auto, on_hour, off_hour, init_bag, init_gift));
     } else {
       LOG(LL_ERROR, ("Failed to open file for writing"));
     }
@@ -55,29 +59,35 @@ static void save_counts_to_json() {
 }
 
 
+
 // Function to load total bag count, total gift count, enable_auto, on_hour, and off_hour from JSON
 static void load_counts_from_json() {
   const char *filename = mgos_sys_config_get_coin_count_file();
   FILE *f = fopen(filename, "r");
   if (f != NULL) {
-    char buffer[200];
+    char buffer[256]; // Aumenta el tamaño si es necesario
     int len = fread(buffer, 1, sizeof(buffer) - 1, f);
     buffer[len] = '\0';
     fclose(f);
-    double total_bag, total_gift;
+    double total_bag, total_gift, init_bag, init_gift;
     bool enable_auto;
     int on_hour, off_hour;
-    json_scanf(buffer, len, "{total_bag: %lf, total_gift: %lf, enable_auto: %B, on_hour: %d, off_hour: %d}", &total_bag, &total_gift, &enable_auto, &on_hour, &off_hour);
+    json_scanf(buffer, len, "{total_bag: %lf, total_gift: %lf, enable_auto: %B, on_hour: %d, off_hour: %d, init_bag: %lf, init_gift: %lf}",
+               &total_bag, &total_gift, &enable_auto, &on_hour, &off_hour, &init_bag, &init_gift);
     mgos_sys_config_set_app_total_bag(total_bag);
     mgos_sys_config_set_app_total_gift(total_gift);
     mgos_sys_config_set_app_enable_auto(enable_auto);
     mgos_sys_config_set_app_on_hour(on_hour);
     mgos_sys_config_set_app_off_hour(off_hour);
-    LOG(LL_INFO, ("Counts loaded from JSON: bag=%.2f, gift=%.2f, enable_auto=%d, on_hour=%d, off_hour=%d", total_bag, total_gift, enable_auto, on_hour, off_hour));
+    mgos_sys_config_set_app_init_bag(init_bag);
+    mgos_sys_config_set_app_init_gift(init_gift);
+    LOG(LL_INFO, ("Counts loaded from JSON: bag=%.2f, gift=%.2f, enable_auto=%d, on_hour=%d, off_hour=%d, init_bag=%.2f, init_gift=%.2f",
+                  total_bag, total_gift, enable_auto, on_hour, off_hour, init_bag, init_gift));
   } else {
     LOG(LL_ERROR, ("Failed to open file for reading, starting from initial value"));
   }
 }
+
 
 
 // ISR for coin insertion
@@ -116,6 +126,7 @@ static void check_machine_status(void *arg) {
 }
 
 // Timer callback to control the machine based on the schedule
+// Timer callback to control the machine based on the schedule
 static void auto_control_cb(void *arg) {
   load_counts_from_json(); // Reload the counts from JSON to get the latest on_hour and off_hour
   bool enable_auto = mgos_sys_config_get_app_enable_auto();
@@ -127,22 +138,17 @@ static void auto_control_cb(void *arg) {
     struct tm *t = localtime(&now);
     int current_hour = t->tm_hour;
 
-    if (current_hour == on_hour) {
+    if (current_hour >= on_hour && current_hour < off_hour) {
       mgos_gpio_write(pin_machine, 0);  // Turn on the machine
-      LOG(LL_INFO, ("Machine turned on automatically at %d:00", on_hour));
-    } else if (current_hour == off_hour) {
+      LOG(LL_INFO, ("Machine turned on automatically between %d:00 and %d:00", on_hour, off_hour));
+    } else {
       mgos_gpio_write(pin_machine, 1);  // Turn off the machine
-      LOG(LL_INFO, ("Machine turned off automatically at %d:00", off_hour));
-    } else if (current_hour > on_hour && current_hour < off_hour && !mgos_gpio_read(pin_machine)) {
-      mgos_gpio_write(pin_machine, 0);  // Ensure the machine stays on between on_hour and off_hour
-      LOG(LL_INFO, ("Machine re-enabled during operational hours"));
-    } else if ((current_hour < on_hour || current_hour > off_hour) && mgos_gpio_read(pin_machine)) {
-      mgos_gpio_write(pin_machine, 1);  // Ensure the machine stays off outside operational hours
-      LOG(LL_INFO, ("Machine disabled outside operational hours"));
+      LOG(LL_INFO, ("Machine turned off automatically outside %d:00 and %d:00", on_hour, off_hour));
     }
   }
   (void) arg;
 }
+
 
 // Timer callback to periodically save the counts
 static void report_timer_cb(void *arg) {
@@ -163,6 +169,8 @@ static void report_timer_cb(void *arg) {
               "  enable_auto: %B,\n"
               "  on_hour: %d,\n"
               "  off_hour: %d,\n"
+              "  init_bag: %.2f,\n"
+              "  init_gift: %.2f,\n"
               "  time: %Q\n"
               "}",
               mgos_sys_config_get_app_total_bag(),
@@ -171,6 +179,8 @@ static void report_timer_cb(void *arg) {
               mgos_sys_config_get_app_enable_auto(),
               mgos_sys_config_get_app_on_hour(),
               mgos_sys_config_get_app_off_hour(),
+              mgos_sys_config_get_app_init_bag(),
+              mgos_sys_config_get_app_init_gift(),
               time_str);
 
   mgos_mqtt_pub(rpc_topic_pub, message, strlen(message), 1, false);
@@ -178,13 +188,14 @@ static void report_timer_cb(void *arg) {
   (void) arg;
 }
 
+
 // RPC handler to set the total bag and total gift counts
 static void rpc_set_counters_handler(struct mg_rpc_request_info *ri,
                                      const char *args,
                                      const char *src,
                                      void *cb_arg) {
-  double total_bag, total_gift;
-  bool bag_set = false, gift_set = false;
+  double total_bag, total_gift, init_bag, init_gift;
+  bool bag_set = false, gift_set = false, init_bag_set = false, init_gift_set = false;
   if (json_scanf(args, strlen(args), "{total_bag: %lf}", &total_bag) == 1) {
     mgos_sys_config_set_app_total_bag(total_bag);
     bag_set = true;
@@ -193,12 +204,21 @@ static void rpc_set_counters_handler(struct mg_rpc_request_info *ri,
     mgos_sys_config_set_app_total_gift(total_gift);
     gift_set = true;
   }
-  if (bag_set || gift_set) {
+  if (json_scanf(args, strlen(args), "{init_bag: %lf}", &init_bag) == 1) {
+    mgos_sys_config_set_app_init_bag(init_bag);
+    init_bag_set = true;
+  }
+  if (json_scanf(args, strlen(args), "{init_gift: %lf}", &init_gift) == 1) {
+    mgos_sys_config_set_app_init_gift(init_gift);
+    init_gift_set = true;
+  }
+  if (bag_set || gift_set || init_bag_set || init_gift_set) {
     save_counts_to_json();
     mg_rpc_send_responsef(ri, "{id: %d, result: true}", ri->id);
-    LOG(LL_INFO, ("Set counts via RPC: bag_set=%d, gift_set=%d", bag_set, gift_set));
-    char confirmation_msg[128];
-    snprintf(confirmation_msg, sizeof(confirmation_msg), "{\"confirmation\": \"Counts updated via RPC\", \"total_bag\": %.2f, \"total_gift\": %.2f}", mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift());
+    LOG(LL_INFO, ("Set counts via RPC: bag_set=%d, gift_set=%d, init_bag_set=%d, init_gift_set=%d", bag_set, gift_set, init_bag_set, init_gift_set));
+    char confirmation_msg[256];
+    snprintf(confirmation_msg, sizeof(confirmation_msg), "{\"confirmation\": \"Counts updated via RPC\", \"total_bag\": %.2f, \"total_gift\": %.2f, \"init_bag\": %.2f, \"init_gift\": %.2f}",
+             mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift(), mgos_sys_config_get_app_init_bag(), mgos_sys_config_get_app_init_gift());
     mgos_mqtt_pub(confirmation_topic, confirmation_msg, strlen(confirmation_msg), 1, false);
   } else {
     mg_rpc_send_errorf(ri, 400, "Invalid parameters format");
@@ -207,6 +227,7 @@ static void rpc_set_counters_handler(struct mg_rpc_request_info *ri,
 
   (void) cb_arg;
 }
+
 
 // RPC handler to set enable_auto
 static void rpc_set_enable_auto_handler(struct mg_rpc_request_info *ri,
@@ -275,6 +296,7 @@ static void rpc_set_off_hour_handler(struct mg_rpc_request_info *ri,
 }
 
 // MQTT message handler to change the configuration
+// MQTT message handler to change the configuration
 static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
                                  int topic_len, const char *msg, int msg_len,
                                  void *userdata) {
@@ -283,8 +305,8 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   struct json_token method_token, params_token;
   if (json_scanf(msg, msg_len, "{method: %T, params: %T}", &method_token, &params_token) == 2) {
     if (strncmp(method_token.ptr, "Counters.Set", method_token.len) == 0) {
-      double total_bag, total_gift;
-      bool bag_set = false, gift_set = false;
+      double total_bag, total_gift, init_bag, init_gift;
+      bool bag_set = false, gift_set = false, init_bag_set = false, init_gift_set = false;
       if (json_scanf(params_token.ptr, params_token.len, "{total_bag: %lf}", &total_bag) == 1) {
         mgos_sys_config_set_app_total_bag(total_bag);
         bag_set = true;
@@ -293,14 +315,23 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
         mgos_sys_config_set_app_total_gift(total_gift);
         gift_set = true;
       }
-      if (bag_set || gift_set) {
+      if (json_scanf(params_token.ptr, params_token.len, "{init_bag: %lf}", &init_bag) == 1) {
+        mgos_sys_config_set_app_init_bag(init_bag);
+        init_bag_set = true;
+      }
+      if (json_scanf(params_token.ptr, params_token.len, "{init_gift: %lf}", &init_gift) == 1) {
+        mgos_sys_config_set_app_init_gift(init_gift);
+        init_gift_set = true;
+      }
+      if (bag_set || gift_set || init_bag_set || init_gift_set) {
         save_counts_to_json();
-        LOG(LL_INFO, ("Set counts via MQTT: bag_set=%d, gift_set=%d", bag_set, gift_set));
-        char confirmation_msg[128];
-        snprintf(confirmation_msg, sizeof(confirmation_msg), "{\"confirmation\": \"Counts updated via MQTT\", \"total_bag\": %.2f, \"total_gift\": %.2f}", mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift());
+        LOG(LL_INFO, ("Set counts via MQTT: bag_set=%d, gift_set=%d, init_bag_set=%d, init_gift_set=%d", bag_set, gift_set, init_bag_set, init_gift_set));
+        char confirmation_msg[256];
+        snprintf(confirmation_msg, sizeof(confirmation_msg), "{\"confirmation\": \"Counts updated via MQTT\", \"total_bag\": %.2f, \"total_gift\": %.2f, \"init_bag\": %.2f, \"init_gift\": %.2f}",
+                 mgos_sys_config_get_app_total_bag(), mgos_sys_config_get_app_total_gift(), mgos_sys_config_get_app_init_bag(), mgos_sys_config_get_app_init_gift());
         mgos_mqtt_pub(confirmation_topic, confirmation_msg, strlen(confirmation_msg), 1, false);
       } else {
-        LOG(LL_ERROR, ("Invalid JSON format for total_bag and total_gift parameters"));
+        LOG(LL_ERROR, ("Invalid JSON format for total_bag, total_gift, init_bag, and init_gift parameters"));
       }
     } else if (strncmp(method_token.ptr, "App.SetEnableAuto", method_token.len) == 0) {
       bool enable_auto;
@@ -348,6 +379,7 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   (void) nc;
   (void) userdata;
 }
+
 
 // Inicialización del DS3231
 bool ds3231_init(void) {
