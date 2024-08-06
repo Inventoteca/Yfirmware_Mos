@@ -215,7 +215,7 @@ static void report_timer_cb(void *arg) {
               "  off_hour: %d,\n"
               "  init_bag: %.2f,\n"
               "  init_gift: %.2f,\n"
-              "  time: %Q\n"
+              "  time: %s\n"
               "}",
               total_bag,
               total_gift,
