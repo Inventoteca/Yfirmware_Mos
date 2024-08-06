@@ -8,6 +8,7 @@
 #include "frozen.h"
 #include "mgos_rpc.h"
 #include "mgos_dash.h"
+#include "mgos_pwm.h"
 
 // Global variables
 static mgos_timer_id report_timer_id;
@@ -22,16 +23,10 @@ const char *machine_id;
 int pin_machine = 4;
 int status_pin = 33;
 
-char time_str[9];
+char time_str[30];
 char date_str[12];
 
 bool enable_auto;
-<<<<<<< HEAD
-int on_hour, off_hour;
-double total_bag;
-double total_gift;
-
-=======
 int on_hour = 9;
 int off_hour = 22;
 
@@ -44,7 +39,6 @@ double init_bag;
 double init_gift;
 
 bool machine_on;
->>>>>>> 05e595eb7c8d2806b8cd19e83d5264e185d1825e
 
 // Declaración del manejador del DS3231
 struct mgos_ds3231 *rtc = NULL;
@@ -60,26 +54,6 @@ bool current_status;
 
 // Function to save total bag count, total gift count, enable_auto, on_hour, and off_hour to JSON
 static void save_counts_to_json() {
-<<<<<<< HEAD
-  const char *filename = mgos_sys_config_get_coin_count_file();
-  
-  //double total_bag = mgos_sys_config_get_app_total_bag();
-  //double total_gift = mgos_sys_config_get_app_total_gift();
-
-  total_bag = mgos_sys_config_get_app_total_bag();
-  total_gift = mgos_sys_config_get_app_total_gift();
-
-  enable_auto = mgos_sys_config_get_app_enable_auto();
-  //int on_hour = mgos_sys_config_get_app_on_hour();
-  //int off_hour = mgos_sys_config_get_app_off_hour();
-  on_hour = mgos_sys_config_get_app_on_hour();
-  off_hour = mgos_sys_config_get_app_off_hour();
-  double init_bag = mgos_sys_config_get_app_init_bag();
-  double init_gift = mgos_sys_config_get_app_init_gift();
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
-  char time_str[20];
-=======
   //const char *filename = mgos_sys_config_get_coin_count_file();
   //double total_bag = mgos_sys_config_get_app_total_bag();
   //double total_gift = mgos_sys_config_get_app_total_gift();
@@ -93,7 +67,6 @@ static void save_counts_to_json() {
   t = localtime(&now);
   //struct tm *t = localtime(&now);
   //char time_str[20];
->>>>>>> 05e595eb7c8d2806b8cd19e83d5264e185d1825e
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
   char *json_str = json_asprintf("{total_bag: %.2f, total_gift: %.2f, enable_auto: %B, on_hour: %d, off_hour: %d, init_bag: %.2f, init_gift: %.2f, time: \"%s\"}",
                                  total_bag, total_gift, enable_auto, on_hour, off_hour, init_bag, init_gift, time_str);
@@ -125,10 +98,6 @@ static void load_counts_from_json()
     int len = fread(buffer, 1, sizeof(buffer) - 1, f);
     buffer[len] = '\0';
     fclose(f);
-<<<<<<< HEAD
-    double init_bag, init_gift;
-=======
->>>>>>> 05e595eb7c8d2806b8cd19e83d5264e185d1825e
     //double total_bag, total_gift, init_bag, init_gift;
     //bool enable_auto;
     //int on_hour, off_hour;
@@ -152,18 +121,11 @@ static void load_counts_from_json()
 
 // ISR for coin insertion
 static void coin_isr(int pin, void *arg) {
-<<<<<<< HEAD
-  total_bag = mgos_sys_config_get_app_total_bag() + 1.0;
-  mgos_sys_config_set_app_total_bag(total_bag);
-  LOG(LL_INFO, ("Coin inserted! Total bag count: %.2f", total_bag));
-  save_counts_to_json();
-=======
   //double total_bag = mgos_sys_config_get_app_total_bag() + 1.0;
   total_bag++;
   //mgos_sys_config_set_app_total_bag(total_bag);
   //LOG(LL_INFO, ("Coin inserted! Total bag count: %.2f", total_bag));
   //save_counts_to_json();
->>>>>>> 05e595eb7c8d2806b8cd19e83d5264e185d1825e
   (void) pin;
   (void) arg;
 }
@@ -199,18 +161,9 @@ static void check_machine_status(void *arg) {
 // Timer callback to control the machine based on the schedule
 static void auto_control_cb(void *arg) {
   load_counts_from_json(); // Reload the counts from JSON to get the latest on_hour and off_hour
-<<<<<<< HEAD
-  enable_auto = mgos_sys_config_get_app_enable_auto();
-  //int on_hour = mgos_sys_config_get_app_on_hour();
-  //int off_hour = mgos_sys_config_get_app_off_hour();
-
-  on_hour = mgos_sys_config_get_app_on_hour();
-  off_hour = mgos_sys_config_get_app_off_hour();
-=======
   //enable_auto = mgos_sys_config_get_app_enable_auto();
   //on_hour = mgos_sys_config_get_app_on_hour();
   //off_hour = mgos_sys_config_get_app_off_hour();
->>>>>>> 05e595eb7c8d2806b8cd19e83d5264e185d1825e
 
   char message[64];
   
@@ -263,7 +216,7 @@ static void report_timer_cb(void *arg) {
               "  off_hour: %d,\n"
               "  init_bag: %.2f,\n"
               "  init_gift: %.2f,\n"
-              "  time: %s\n"
+              "  time: %Q\n"
               "}",
               total_bag,
               total_gift,
@@ -404,10 +357,6 @@ static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
   if (json_scanf(msg, msg_len, "{method: %T, params: %T}", &method_token, &params_token) == 2) {
     if (strncmp(method_token.ptr, "Counters.Set", method_token.len) == 0) {
       //double total_bag, total_gift, init_bag, init_gift;
-<<<<<<< HEAD
-      double init_bag, init_gift;
-=======
->>>>>>> 05e595eb7c8d2806b8cd19e83d5264e185d1825e
       bool bag_set = false, gift_set = false, init_bag_set = false, init_gift_set = false;
       if (json_scanf(params_token.ptr, params_token.len, "{total_bag: %lf}", &total_bag) == 1) {
         //mgos_sys_config_set_app_total_bag(total_bag);
@@ -552,6 +501,8 @@ enum mgos_app_init_result mgos_app_init(void)
 
   // Set a timer to control the machine automatically based on the schedule
   auto_control_timer_id = mgos_set_timer(5000 /* 1 minute */, MGOS_TIMER_REPEAT, auto_control_cb, NULL);
+
+  mgos_pwm_set(13, 50, 0.1); // 5% = 0°, 10% = 180°
 
   return MGOS_APP_INIT_SUCCESS;
 }

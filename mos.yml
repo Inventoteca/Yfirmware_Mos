@@ -25,7 +25,7 @@ libs:
   - origin: https://github.com/mongoose-os-libs/rpc-service-i2c
   - origin: https://github.com/mongoose-os-libs/rpc-uart
   - origin: https://github.com/mongoose-os-libs/rpc-service-gpio
-  #- origin: https://github.com/mongoose-os-libs/mjs 
+  - origin: https://github.com/mongoose-os-libs/mjs 
   - origin: https://github.com/mongoose-os-libs/wifi
   - origin: https://github.com/mongoose-os-libs/sntp
   #- origin: https://github.com/mongoose-os-libs/ota-http-server
@@ -37,19 +37,21 @@ libs:
   - origin: https://github.com/mongoose-os-libs/ds3231
   - origin: https://github.com/mongoose-os-libs/mqtt
   - origin: https://github.com/mongoose-os-libs/rpc-mqtt
+  - origin: https://github.com/mongoose-os-libs/pwm
 
 
-build_vars:
-  COIN_PIN: 26
-  COIN_COUNT_FILE: '"/counters.json"'
-  COIN_REPORT_DELAY: 5000
+#build_vars:
+#  COIN_PIN: 26
+#  COIN_COUNT_FILE: '"/counters.json"'
+#  COIN_REPORT_DELAY: 5000
 
 config_schema:
   - ["app.total_bag", "d", 0.0, {title: "Total bag count"}]
   - ["app.total_gift", "d", 0.0, {title: "Total gift count"}]
   - ["app.init_bag", "d", 0.0, {title: "Init bag count"}]
   - ["app.init_gift", "d", 0.0, {title: "Init gift count"}]
-  - ["app.machine_id", "s", "M-E2-EA-MUEE-0", {title: "Machine ID"}]
+  # Yumiso productivo M-E2-EA-MUEE-0
+  - ["app.machine_id", "s", "M-E2-EA-MUEE-1", {title: "Machine ID"}]
   - ["sys.mount.fs_size", "i", 2048, {title: "Filesystem size in KB"}]
 
   - ["wifi.sta.ssid", "Inventoteca_2G"]
@@ -72,8 +74,14 @@ config_schema:
   - ["coin.report_delay", "i", 5000, {title: "Coin report delay in ms"}]
 
   - ["dash.enable", "b", true, {title: "Enable mDash"}]
-  - ["dash.token", "s", "VDUa91GFeMaO4m5Yxyh90pXQ", {title: "mDash token"}]
+  # Yumiso productivo VDUa91GFeMaO4m5Yxyh90pXQ
+  - ["dash.token", "s", "KigoZFTQILB0I4OLHhr4Hg", {title: "mDash token"}]  
   - ["rpc.uart.enable", "b", true, {title: "Enable UART for RPC"}]
+
+  - ["file_logger.enable", "b", true, {title: "Enable file logger"}]
+  - ["file_logger.log_file_max_size", "i", 5000, {title: "Max log file size in bytes"}]
+  - ["file_logger.max_log_files", "i", 10, {title: "Max number of log files"}]
+  - ["file_logger.enable", true]
 
   - ["mqtt.enable", "b", true, {title: "Enable MQTT"}]
   - ["mqtt.server", "s", "broker.emqx.io:1883", {title: "MQTT Server"}]
