@@ -46,12 +46,12 @@ libs:
 #  COIN_REPORT_DELAY: 5000
 
 config_schema:
-  - ["app.total_bag", "d", 0.0, {title: "Total bag count"}]
-  - ["app.total_gift", "d", 0.0, {title: "Total gift count"}]
-  - ["app.init_bag", "d", 0.0, {title: "Init bag count"}]
-  - ["app.init_gift", "d", 0.0, {title: "Init gift count"}]
+  #- ["app.total_bag", "d", 0.0, {title: "Total bag count"}]
+  #- ["app.total_gift", "d", 0.0, {title: "Total gift count"}]
+  #- ["app.init_bag", "d", 0.0, {title: "Init bag count"}]
+  #- ["app.init_gift", "d", 0.0, {title: "Init gift count"}]
   # Yumiso productivo M-E2-EA-MUEE-0
-  - ["app.machine_id", "s", "M-E2-EA-MUEE-1", {title: "Machine ID"}]
+  - ["app.machine_id", "s", "M-E2-EA-MUEE-0", {title: "Machine ID"}]
   - ["sys.mount.fs_size", "i", 2048, {title: "Filesystem size in KB"}]
 
   - ["wifi.sta.ssid", "Inventoteca_2G"]
@@ -65,17 +65,20 @@ config_schema:
   - ["gift_pin", "i", 25, {title: "Gift pin"}]
   - ["pin_machine", "i", 4, {title: "Pin to control relay machine"}]
   - ["status_pin", "i", 33, {title: "Pin to read machine status"}]
-  - ["machine_on", "b", false, {title: "Machine on status"}]
-  - ["app.enable_auto", "b", false, {title: "Enable automatic control"}]
-  - ["app.on_hour", "i", 8, {title: "Hour to turn on the machine"}]
-  - ["app.off_hour", "i", 16, {title: "Hour to turn off the machine"}]
+  #- ["machine_on", "b", false, {title: "Machine on status"}]
+  #- ["app.enable_auto", "b", false, {title: "Enable automatic control"}]
+  #- ["app.on_hour", "i", 8, {title: "Hour to turn on the machine"}]
+  #- ["app.off_hour", "i", 16, {title: "Hour to turn off the machine"}]
 
   #- ["coin.count_file", "s", "/counters.json", {title: "Coin count file"}]
-  - ["coin.report_delay", "i", 5000, {title: "Coin report delay in ms"}]
+  - ["app.report_delay", "i", 5000, {title: "Coin report delay in ms"}]
+  - ["app.status_time", "i",60000, {title: "read machine status"}]
+  - ["app.auto_time", "i",60000, {title: "Auto off/on time"}]
 
   - ["dash.enable", "b", true, {title: "Enable mDash"}]
   # Yumiso productivo VDUa91GFeMaO4m5Yxyh90pXQ
-  - ["dash.token", "s", "KigoZFTQILB0I4OLHhr4Hg", {title: "mDash token"}]  
+  # Test KigoZFTQILB0I4OLHhr4Hg
+  - ["dash.token", "s", "VDUa91GFeMaO4m5Yxyh90pXQ", {title: "mDash token"}]  
   - ["rpc.uart.enable", "b", true, {title: "Enable UART for RPC"}]
 
   - ["file_logger.enable", "b", true, {title: "Enable file logger"}]

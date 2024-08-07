@@ -20,14 +20,23 @@ UART.setConfig(uartNo, {
 
 // Set dispatcher callback, it will be called whenver new Rx data or space in
 // the Tx buffer becomes available
-UART.setDispatcher(uartNo, function(uartNo) {
+UART.setDispatcher(uartNo, function(uartNo) 
+{
   let ra = UART.readAvail(uartNo);
-  if (ra > 0) {
+  if (ra > 0) 
+  {
     // Received new data: print it immediately to the console, and also
     // accumulate in the "rxAcc" variable which will be echoed back to UART later
     let data = UART.read(uartNo);
     //print('Received UART data:', data);
     rxAcc += data;
+  }
+
+  if (rxAcc.length > 0) 
+  {
+    print('Received UART data:', rxAcc);
+    parseGPSData(rxAcc);  // Parse and process the received data
+    rxAcc = '';
   }
 }, null);
 
@@ -35,18 +44,9 @@ UART.setDispatcher(uartNo, function(uartNo) {
 UART.setRxEnabled(uartNo, true);
 
 // Send UART data every second
-Timer.set(10000 /* milliseconds */, Timer.REPEAT, function() {
+Timer.set(10000 /* milliseconds */, Timer.REPEAT, function() 
+{
+  
 
-    print('Received UART data:', rxAcc);
-//  value = !value;
-//  UART.write(
-//    uartNo,
-//    'Hello UART! '
-//      + (value ? 'Tick' : 'Tock')
-//      + ' uptime: ' + JSON.stringify(Sys.uptime())
-//      + ' RAM: ' + JSON.stringify(Sys.free_ram())
-//      + (rxAcc.length > 0 ? (' Rx: ' + rxAcc) : '')
-//      + '\n'
-//  );
-  rxAcc = '';
+
 }, null);
