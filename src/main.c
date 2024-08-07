@@ -66,7 +66,8 @@ int coin_pin = 26;
 bool current_status;
 
 // Function to save total bag count, total gift count, enable_auto, on_hour, and off_hour to JSON if there are changes
-static void save_counts_to_json() {
+static void save_counts_to_json() 
+{
   if (total_bag == prev_total_bag &&
       total_gift == prev_total_gift &&
       enable_auto == prev_enable_auto &&
@@ -88,12 +89,12 @@ static void save_counts_to_json() {
   prev_init_bag = init_bag;
   prev_init_gift = init_gift;
 
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
+  //time_t now = time(NULL);
+  //struct tm *t = localtime(&now);
 
-  char time_str[20];
-  strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
-  char *json_str = json_asprintf("{\"total_bag\": %lld, \"total_gift\": %lld, \"enable_auto\": %d, \"on_hour\": %d, \"off_hour\": %d, \"init_bag\": %lld, \"init_gift\": %lld}",
+  //char time_str[20];
+  //strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
+  char *json_str = json_asprintf("{total_bag: %lld, total_gift: %lld, enable_auto: %d, on_hour: %d, off_hour: %d, init_bag: %lld, init_gift: %lld}",
                                  total_bag, total_gift, enable_auto, on_hour, off_hour, init_bag, init_gift);
   if (json_str != NULL) {
     FILE *f = fopen(filename, "w");
@@ -116,25 +117,15 @@ static void save_counts_to_json() {
 // Function to load total bag count, total gift count, enable_auto, on_hour, and off_hour from JSON
 static void load_counts_from_json() 
 {
-  //const char *filename = mgos_sys_config_get_coin_count_file();
   FILE *f = fopen(filename, "r");
   if (f != NULL) {
-    //char buffer[256]; // Aumenta el tamaño si es necesario
-    len = fread(buffer, 1, sizeof(buffer) - 1, f);
+    char buffer[512]; // Aumenta el tamaño si es necesario
+    int len = fread(buffer, 1, sizeof(buffer) - 1, f);
     buffer[len] = '\0';
     fclose(f);
-    //double total_bag, total_gift, init_bag, init_gift;
-    //bool enable_auto;
-    //int on_hour, off_hour;
-    json_scanf(buffer, len, "{total_bag: %lld, total_gift: %lld, enable_auto: %B, on_hour: %d, off_hour: %d, init_bag: %lld, init_gift: %lld}",
+    json_scanf(buffer, len, "{total_bag: %lld, total_gift: %lld, enable_auto: %d, on_hour: %d, off_hour: %d, init_bag: %lld, init_gift: %lld}",
                &total_bag, &total_gift, &enable_auto, &on_hour, &off_hour, &init_bag, &init_gift);
-    //mgos_sys_config_set_app_total_bag(total_bag);
-    //mgos_sys_config_set_app_total_gift(total_gift);
-    //mgos_sys_config_set_app_enable_auto(enable_auto);
-    //mgos_sys_config_set_app_on_hour(on_hour);
-    //mgos_sys_config_set_app_off_hour(off_hour);
-    //mgos_sys_config_set_app_init_bag(init_bag);
-    //mgos_sys_config_set_app_init_gift(init_gift);
+
     LOG(LL_INFO, ("Counts loaded from JSON: bag=%lld, gift=%lld, enable_auto=%d, on_hour=%d, off_hour=%d, init_bag=%lld, init_gift=%lld",
                   total_bag, total_gift, enable_auto, on_hour, off_hour, init_bag, init_gift));
   } else {
@@ -146,67 +137,47 @@ static void load_counts_from_json()
 
 // ISR for coin insertion
 static void coin_isr(int pin, void *arg) {
-  //double total_bag = mgos_sys_config_get_app_total_bag() + 1.0;
   total_bag++;
-  //mgos_sys_config_set_app_total_bag(total_bag);
-  //LOG(LL_INFO, ("Coin inserted! Total bag count: %.2f", total_bag));
-  //save_counts_to_json();
   (void) pin;
   (void) arg;
 }
 
 // ISR for gift insertion
 static void gift_isr(int pin, void *arg) {
-  //double total_gift = mgos_sys_config_get_app_total_gift() + 1.0;
   total_gift++;
-  //mgos_sys_config_set_app_total_gift(total_gift);
-  //LOG(LL_INFO, ("Gift inserted! Total gift count: %.2f", total_gift));
-  //save_counts_to_json();
   (void) pin;
   (void) arg;
 }
 
 // Function to check the status of the machine and update machine_on
 static void check_machine_status(void *arg) {
-  //int status_pin = mgos_sys_config_get_status_pin();
-  current_status = mgos_gpio_read(status_pin);
-  //bool machine_on = mgos_sys_config_get_machine_on();
-  if (current_status != machine_on) {
-    //mgos_sys_config_set_machine_on(current_status);
-    char message[64];
-    snprintf(message, sizeof(message), "{\"machine_on\": %s}", current_status ? "true" : "false");
-    mgos_mqtt_pub(status_topic, message, strlen(message), 1, false);
-    LOG(LL_INFO, ("Machine status changed: machine_on=%s", current_status ? "true" : "false"));
-  }
-  machine_on=current_status;
+
+  machine_on=mgos_gpio_read(status_pin);
 
   if (enable_auto) 
   {
-    //time_t now = time(NULL);
     now = time(NULL);
-    //struct tm *t = localtime(&now);
     t = localtime(&now);
-    //int current_hour = t->tm_hour;
     current_hour = t->tm_hour;
 
     if ((current_hour >= on_hour) && (current_hour < off_hour)) 
     {
-      if(!machine_on) // Si la maquina esta apagada la enciende
+      if(machine_on == false) // Si la maquina esta apagada la enciende
       {
       mgos_gpio_write(pin_machine, 0);  // Turn on the machine
       snprintf(message, sizeof(message), "{\"power_on_auto\": %s}", "true");
       mgos_mqtt_pub(status_topic, message, strlen(message), 1, false);
-      LOG(LL_INFO, ("Machine turned on automatically between %d:00 and %d:00", on_hour, off_hour));
-      }
+      LOG(LL_INFO, ("%d Machine Auto ON %d:00 and %d:00", current_hour, on_hour, off_hour));
+      } 
     } 
     else 
     {
-      if(machine_on) // Si la maquina esta encendida la apaga
+      if(machine_on == true) // Si la maquina esta encendida la apaga
       {
       mgos_gpio_write(pin_machine, 1);  // Turn off the machine
       snprintf(message, sizeof(message), "{\"power_on_auto\": %s}", "false");
       mgos_mqtt_pub(status_topic, message, strlen(message), 1, false);
-      LOG(LL_INFO, ("Machine turned off automatically outside %d:00 and %d:00", on_hour, off_hour));
+      LOG(LL_INFO, ("%d Machine Auto OFF %d:00 and %d:00", current_hour, on_hour, off_hour));
       }
     }
   }
@@ -214,59 +185,14 @@ static void check_machine_status(void *arg) {
   (void) arg;
 }
 
-// Timer callback to control the machine based on the schedule
-// Timer callback to control the machine based on the schedule
-/*static void auto_control_cb(void *arg) {
-  load_counts_from_json(); // Reload the counts from JSON to get the latest on_hour and off_hour
-  //enable_auto = mgos_sys_config_get_app_enable_auto();
-  //on_hour = mgos_sys_config_get_app_on_hour();
-  //off_hour = mgos_sys_config_get_app_off_hour();
-
-  //char message[64];
-  
-
-  if (enable_auto) 
-  {
-    //time_t now = time(NULL);
-    now = time(NULL);
-    //struct tm *t = localtime(&now);
-    t = localtime(&now);
-    //int current_hour = t->tm_hour;
-    current_hour = t->tm_hour;
-
-    if ((current_hour >= on_hour) && (current_hour < off_hour)) 
-    {
-      if(!machine_on) // Si la maquina esta apagada la enciende
-      {
-      mgos_gpio_write(pin_machine, 0);  // Turn on the machine
-      snprintf(message, sizeof(message), "{\"power_on_auto\": %s}", "true");
-      mgos_mqtt_pub(status_topic, message, strlen(message), 1, false);
-      LOG(LL_INFO, ("Machine turned on automatically between %d:00 and %d:00", on_hour, off_hour));
-      }
-    } 
-    else 
-    {
-      if(machine_on) // Si la maquina esta encendida la apaga
-      {
-      mgos_gpio_write(pin_machine, 1);  // Turn off the machine
-      snprintf(message, sizeof(message), "{\"power_on_auto\": %s}", "false");
-      mgos_mqtt_pub(status_topic, message, strlen(message), 1, false);
-      LOG(LL_INFO, ("Machine turned off automatically outside %d:00 and %d:00", on_hour, off_hour));
-      }
-    }
-  }
-  (void) arg;
-}
-*/
 
 // Timer callback to periodically save the counts
 static void report_timer_cb(void *arg) {
   save_counts_to_json();
-  //time_t 
+  check_machine_status(NULL);
+  
   now = time(NULL);
-  //struct tm *
   t = localtime(&now);
-  ///char time_str[20];
   strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
   
   //char message[512];  // Aumenta el tamaño si es necesario
@@ -415,13 +341,13 @@ static void rpc_set_off_hour_handler(struct mg_rpc_request_info *ri,
 // MQTT message handler to change the configuration
 // MQTT message handler to change the configuration
 
-static void mqtt_message_handler(struct mg_connection *nc, const char *topic,
-                                 int topic_len, const char *msg, int msg_len,
-                                 void *userdata) {
+static void mqtt_message_handler(struct mg_connection *nc, const char *topic,int topic_len, const char *msg, int msg_len,void *userdata) 
+{
   LOG(LL_INFO, ("Received message on topic %.*s: %.*s", topic_len, topic, msg_len, msg));
 
   struct json_token method_token, params_token;
-  if (json_scanf(msg, msg_len, "{method: %T, params: %T}", &method_token, &params_token) == 2) {
+  if (json_scanf(msg, msg_len, "{method: %T, params: %T}", &method_token, &params_token) == 2) 
+  {
     if (strncmp(method_token.ptr, "Counters.Set", method_token.len) == 0) {
       //double total_bag, total_gift, init_bag, init_gift;
       bool bag_set = false, gift_set = false, init_bag_set = false, init_gift_set = false;
@@ -563,8 +489,8 @@ enum mgos_app_init_result mgos_app_init(void)
   mgos_mqtt_sub(rpc_topic_sub, mqtt_message_handler, NULL);
 
   // Set a timer to check the machine status periodically
-  status_time = mgos_sys_config_get_app_status_time();
-  status_check_timer_id = mgos_set_timer(status_time /* 1 second */, MGOS_TIMER_REPEAT, check_machine_status, NULL);
+  //status_time = mgos_sys_config_get_app_status_time();
+  //status_check_timer_id = mgos_set_timer(status_time /* 1 second */, MGOS_TIMER_REPEAT, check_machine_status, NULL);
 
   report_delay = mgos_sys_config_get_app_report_delay();
   report_timer_id = mgos_set_timer(report_delay, MGOS_TIMER_REPEAT, report_timer_cb, NULL);

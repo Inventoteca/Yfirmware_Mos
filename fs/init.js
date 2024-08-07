@@ -34,8 +34,8 @@ UART.setDispatcher(uartNo, function(uartNo)
 
   if (rxAcc.length > 0) 
   {
-    print('Received UART data:', rxAcc);
-    parseGPSData(rxAcc);  // Parse and process the received data
+    //print('Received UART data:', rxAcc);
+    //parseGPSData(rxAcc);  // Parse and process the received data
     rxAcc = '';
   }
 }, null);
