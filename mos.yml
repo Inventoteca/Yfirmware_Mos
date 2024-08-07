@@ -81,7 +81,7 @@ config_schema:
   - ["dash.token", "s", "VDUa91GFeMaO4m5Yxyh90pXQ", {title: "mDash token"}]  
   - ["rpc.uart.enable", "b", true, {title: "Enable UART for RPC"}]
 
-  - ["file_logger.enable", "b", true, {title: "Enable file logger"}]
+  - ["file_logger.enable", "b", false, {title: "Enable file logger"}]
   - ["file_logger.log_file_max_size", "i", 5000, {title: "Max log file size in bytes"}]
   - ["file_logger.max_log_files", "i", 10, {title: "Max number of log files"}]
   - ["file_logger.enable", true]
